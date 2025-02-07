@@ -31,8 +31,8 @@ func aggregateGrades(detailItems []GetDetailItem, KcxzItems []GetKcxzItem) []mod
 				Xqm:                 parseInt64(item.Xqm),
 				Xf:                  parseFloat32(item.Xf),
 				Cj:                  parseFloat32(item.Cj),
-				RegularGradePercent: "平时成绩占比(0%)",
-				FinalGradePercent:   "期末成绩占比(0%)",
+				RegularGradePercent: "平时(0%)",
+				FinalGradePercent:   "期末(0%)",
 			}
 
 		}
