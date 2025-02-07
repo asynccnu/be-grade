@@ -20,16 +20,19 @@ func aggregateGrades(detailItems []GetDetailItem, KcxzItems []GetKcxzItem) []mod
 		if _, exists := gradeMap[key]; !exists {
 
 			gradeMap[key] = &model.Grade{
-				Kcxzmc:    item.Kcxzmc,
-				Kclbmc:    item.Kclbmc,
-				Kcbj:      item.Kcbj,
-				Studentid: item.Xh,
-				JxbId:     item.JxbID,
-				Jd:        parseFloat32(item.Jd),
-				Kcmc:      item.Kcmc,
-				Xnm:       parseInt64(item.Xnm),
-				Xqm:       parseInt64(item.Xqm),
-				Xf:        parseFloat32(item.Xf),
+				Kcxzmc:              item.Kcxzmc,
+				Kclbmc:              item.Kclbmc,
+				Kcbj:                item.Kcbj,
+				Studentid:           item.Xh,
+				JxbId:               item.JxbID,
+				Jd:                  parseFloat32(item.Jd),
+				Kcmc:                item.Kcmc,
+				Xnm:                 parseInt64(item.Xnm),
+				Xqm:                 parseInt64(item.Xqm),
+				Xf:                  parseFloat32(item.Xf),
+				Cj:                  parseFloat32(item.Cj),
+				RegularGradePercent: "平时成绩占比(0%)",
+				FinalGradePercent:   "期末成绩占比(0%)",
 			}
 
 		}

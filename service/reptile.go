@@ -39,6 +39,7 @@ type GetKcxzItem struct {
 	Kcmc   string `json:"kcmc"` //课程名称
 	Xf     string `json:"xf"`   //学分
 	Jd     string `json:"jd"`
+	Cj     string `json:"cj"`
 }
 
 // getDetail 根据学期获取所有成绩,使用的是本科生院成绩详细信息的接口
