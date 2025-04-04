@@ -3,6 +3,7 @@ package service
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/asynccnu/be-grade/repository/model"
 	"io"
@@ -17,6 +18,10 @@ import (
 type GetDetailResp struct {
 	Items []GetDetailItem `json:"items"`
 }
+
+var (
+	COOKIE_TIMEOUT = errors.New("cookie过期")
+)
 
 type GetDetailItem struct {
 	JxbID  string `json:"jxb_id"` //教学班id
@@ -182,7 +187,11 @@ func getKcxz(cookie string, xnm int64, xqm int64, showCount int64) ([]GetKcxzIte
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36 Edg/132.0.0.0")
 
 	// 创建HTTP客户端
-	client := &http.Client{}
+	client := &http.Client{
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse // 禁止自动跳转，返回原始响应
+		},
+	}
 
 	// 发送请求
 	resp, err := client.Do(req)
@@ -190,6 +199,11 @@ func getKcxz(cookie string, xnm int64, xqm int64, showCount int64) ([]GetKcxzIte
 		return nil, fmt.Errorf("发送请求失败: %w", err)
 	}
 	defer resp.Body.Close()
+
+	//如果被重定向的话要做处理
+	if 400 <= resp.StatusCode && resp.StatusCode < 500 {
+		return nil, COOKIE_TIMEOUT
+	}
 
 	// 读取响应
 	body, err := io.ReadAll(resp.Body)
@@ -236,11 +250,20 @@ func GetGrade(cookie string, xnm int64, xqm int64, showCount int64) ([]model.Gra
 	wg.Wait()
 	close(errChan) // 关闭通道
 
+	var finalErr error
 	// 检查通道中的错误
 	for err := range errChan {
-		if err != nil {
-			return nil, err
+		switch err {
+		case COOKIE_TIMEOUT:
+			return nil, COOKIE_TIMEOUT
+		case nil:
+		default:
+			finalErr = err
 		}
+	}
+
+	if finalErr != nil {
+		return nil, finalErr
 	}
 
 	return aggregateGrades(detail, kcxz), nil

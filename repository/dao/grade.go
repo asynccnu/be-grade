@@ -33,7 +33,7 @@ func (d *gradeDAO) FindGrades(ctx context.Context, studentId string, Xnm int64, 
 	var grades []model.Grade
 
 	// 构建查询
-	query := d.db.WithContext(ctx).Where("student_id = ?", studentId)
+	query := d.db.WithContext(ctx).Model(&model.Grade{}).Where("student_id = ?", studentId)
 	if Xnm != 0 { // 如果 Xnm 有值，拼接学年条件
 		query = query.Where("xnm = ?", Xnm)
 	}
@@ -51,16 +51,14 @@ func (d *gradeDAO) FindGrades(ctx context.Context, studentId string, Xnm int64, 
 	return grades, nil
 }
 
-// 批量更新(被AI战胜了,我想不出这么优秀的思路)
-func (d *gradeDAO) BatchInsertOrUpdate(ctx context.Context, grades []model.Grade) (updateGrade []model.Grade, err error) {
-
-	// 提取所有 student_id 和 jxb_id
+func (d *gradeDAO) BatchInsertOrUpdate(ctx context.Context, grades []model.Grade) (affectedGrades []model.Grade, err error) {
+	// 构造联合键：student_id + jxb_id
 	ids := make([]string, len(grades))
 	for i, grade := range grades {
 		ids[i] = grade.Studentid + grade.JxbId
 	}
 
-	// 查询数据库中已有的记录
+	// 查询已有记录
 	var existingGrades []model.Grade
 	if err := d.db.WithContext(ctx).
 		Where("CONCAT(student_id, jxb_id) IN ?", ids).
@@ -68,27 +66,70 @@ func (d *gradeDAO) BatchInsertOrUpdate(ctx context.Context, grades []model.Grade
 		return nil, err
 	}
 
-	// 用 map 比对现有数据和插入数据
+	// 建立现有记录的Map方便比对
 	existingMap := make(map[string]model.Grade)
 	for _, grade := range existingGrades {
-		existingMap[grade.Studentid+grade.JxbId] = grade
+		key := grade.Studentid + grade.JxbId
+		existingMap[key] = grade
 	}
 
-	// 找出需要插入或更新的数据
 	var toInsert []model.Grade
+	var toUpdate []model.Grade
+
 	for _, grade := range grades {
 		key := grade.Studentid + grade.JxbId
-		if _, exists := existingMap[key]; !exists {
+		switch grade.Xqm {
+		case 3:
+			grade.Xqm = 1
+		case 12:
+			grade.Xqm = 2
+		case 16:
+			grade.Xqm = 3
+		}
+
+		if existing, exists := existingMap[key]; !exists {
 			toInsert = append(toInsert, grade)
+		} else {
+			// 你可以根据实际字段进行更精细的字段比较
+			if !isGradeEqual(existing, grade) {
+				toUpdate = append(toUpdate, grade)
+			}
 		}
 	}
 
-	// 批量插入需要新增的记录
+	// 插入新增记录
 	if len(toInsert) > 0 {
 		if err := d.db.WithContext(ctx).Create(&toInsert).Error; err != nil {
 			return nil, err
 		}
 	}
 
-	return toInsert, nil
+	// 批量更新已有但内容有变化的记录
+	if len(toUpdate) > 0 {
+		for _, g := range toUpdate {
+			if err := d.db.WithContext(ctx).Save(&g).Error; err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	// 返回受影响的记录（新增 + 更新）
+	affectedGrades = append(toInsert, toUpdate...)
+	return affectedGrades, nil
+}
+
+func isGradeEqual(a, b model.Grade) bool {
+	return a.Kcmc == b.Kcmc &&
+		a.Xnm == b.Xnm &&
+		a.Xqm == b.Xqm &&
+		a.Xf == b.Xf &&
+		a.Kcxzmc == b.Kcxzmc &&
+		a.Kclbmc == b.Kclbmc &&
+		a.Kcbj == b.Kcbj &&
+		a.Jd == b.Jd &&
+		a.RegularGradePercent == b.RegularGradePercent &&
+		a.RegularGrade == b.RegularGrade &&
+		a.FinalGradePercent == b.FinalGradePercent &&
+		a.FinalGrade == b.FinalGrade &&
+		a.Cj == b.Cj
 }

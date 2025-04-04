@@ -49,11 +49,13 @@ func (s *gradeService) GetGradeByTerm(ctx context.Context, studentId string, xnm
 
 	// 异步回存
 	go func() {
+
 		updateGrades, err := s.gradeDAO.BatchInsertOrUpdate(context.Background(), grades)
 		if err != nil {
 			s.l.Warn("异步回填成绩失败!", logger.FormatLog("cache", err)...)
 			return
 		}
+
 		for _, updateGrade := range updateGrades {
 			s.l.Info(
 				"更新成绩成功!",
@@ -127,7 +129,6 @@ func (s *gradeService) getGradeFromCCNU(ctx context.Context, StudentId string, x
 	//尝试获取cookie
 	getCookieResp, err := s.userClient.GetCookie(ctx, &userv1.GetCookieRequest{
 		StudentId: StudentId,
-		Force:     false,
 	})
 	if err != nil {
 		return nil, err
@@ -136,24 +137,26 @@ func (s *gradeService) getGradeFromCCNU(ctx context.Context, StudentId string, x
 	//尝试获取成绩
 	items, err := GetGrade(getCookieResp.GetCookie(), xnm, xqm, 300)
 	//如果获取失败成绩的话
-	if err != nil {
+	switch err {
+	case nil:
+		return items, nil
 
-		//尝试强制刷新获取cookie
+	case COOKIE_TIMEOUT:
+
+		//尝试获取cookie
 		getCookieResp, err = s.userClient.GetCookie(ctx, &userv1.GetCookieRequest{
 			StudentId: StudentId,
-			Force:     true,
 		})
 		if err != nil {
 			return nil, err
 		}
 
-		//尝试使用新的cookie去获取成绩
+		//尝试获取成绩
 		items, err = GetGrade(getCookieResp.GetCookie(), xnm, xqm, 300)
-		if err != nil {
-			return nil, err
-		}
+		return items, err
 
+	default:
+		return nil, err
 	}
 
-	return items, nil
 }
